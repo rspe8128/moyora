@@ -53,7 +53,7 @@ export function CollabCard({ collab, club, onClick }: CollabCardProps) {
                             isOpen ? "bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400" : "opacity-50"
                         )}
                     >
-                        {isOpen ? 'OPEN' : '종료'}
+                        {isOpen ? '모집 중' : '종료'}
                     </Badge>
                 </div>
 

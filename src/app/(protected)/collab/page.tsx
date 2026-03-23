@@ -124,8 +124,21 @@ export default function CollabPage() {
             });
             const data = await res.json();
             if (data.success) {
-                // Update local state
+                // Update local applicants state
                 setApplicants(prev => prev.map(a => a._id === appId ? { ...a, status } : a));
+                
+                // ALSO update global demo state so CollabModal receives it real-time
+                const applicantDoc = applicants.find(x => x._id === appId);
+                if (applicantDoc && state) {
+                    const appStatus = status === 'approved' ? 'accepted' : 'rejected';
+                    const existingApp = state.applications.find(a => a.applicant_club_id === applicantDoc.clubId && a.collab_id === selectedEventForApplicants?._id);
+                    if (existingApp) {
+                        updateState({ ...state, applications: state.applications.map(a => a.id === existingApp.id ? { ...a, status: appStatus } : a) });
+                    } else {
+                        updateState({ ...state, applications: [...state.applications, { id: appId, collab_id: selectedEventForApplicants?._id, applicant_club_id: applicantDoc.clubId, status: appStatus, applied_at: new Date().toISOString() }] as any});
+                    }
+                }
+                
                 alert(`지원자가 ${status === 'approved' ? '승인' : '거절'}되었습니다.`);
             } else {
                 alert(data.message || '상태 변경 중 오류가 발생했습니다.');
@@ -147,18 +160,38 @@ export default function CollabPage() {
         return state.clubs.find(c => c.leader === session.user?.name) || state.clubs[0];
     }, [session, state]);
 
-    const types = useMemo(() => state ? [...new Set(state.collabs.map(x => x.type))] : [], [state]);
-    const regions = useMemo(() => state ? [...new Set(state.collabs.map(x => x.region))] : [], [state]);
+    const types = ['대회', '포럼', '연구', '기타'];
+    const regions = useMemo(() => state ? [...new Set(state.collabs.map(x => x.region))].filter(r => r !== '민족사관고등학교') : [], [state]);
 
     const filtered = useMemo(() => {
         if (!state) return [];
         const term = query.toLowerCase();
-        return state.collabs.filter(p => {
+        const results = state.collabs.filter(p => {
             const hay = `${p.title} ${p.type} ${p.region}`.toLowerCase();
             if (term && !hay.includes(term)) return false;
-            if (typeFilter !== 'all' && p.type !== typeFilter) return false;
+            if (typeFilter !== 'all') {
+                if (typeFilter === '기타') {
+                    if (p.type.includes('대회') || p.type.includes('포럼') || p.type.includes('연구')) return false;
+                } else {
+                    if (!p.type.includes(typeFilter)) return false;
+                }
+            }
             if (regionFilter !== 'all' && p.region !== regionFilter) return false;
             return true;
+        });
+
+        return results.sort((a, b) => {
+            const aDate = new Date(a.dateEnd || a.dateStart);
+            const bDate = new Date(b.dateEnd || b.dateStart);
+            const aPast = !isNaN(aDate.getTime()) && aDate < new Date();
+            const bPast = !isNaN(bDate.getTime()) && bDate < new Date();
+            
+            // "모집 중" (not past) first
+            if (!aPast && bPast) return -1;
+            if (aPast && !bPast) return 1;
+            
+            // Sort by creation or start date descending
+            return new Date(b.dateStart).getTime() - new Date(a.dateStart).getTime();
         });
     }, [state, query, typeFilter, regionFilter]);
 
@@ -212,9 +245,6 @@ export default function CollabPage() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="space-y-1">
                             <h1 className="text-3xl font-bold tracking-tight text-foreground">협업 모집</h1>
-                            <p className="text-muted-foreground text-sm">
-                                모집 공고 → 지원/연락 → 프로젝트 룸 생성
-                            </p>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -521,7 +551,13 @@ export default function CollabPage() {
                     club={collabClub || (selectedCollab as any)?.virtualClub}
                     open={!!selectedCollabId && !showEditModal && !selectedEventForApplicants}
                     onOpenChange={(open) => !open && setSelectedCollabId(null)}
-                    onApply={() => {
+                    acceptedClubs={state?.clubs.filter(c => 
+                        state.applications.some(a => a.collab_id === selectedCollab?.id && a.applicant_club_id === c.id && a.status === 'accepted')
+                    ) || []}
+                    onClubClick={(clubId) => {
+                        window.location.href = `/club/${clubId}`;
+                    }}
+                    onApply={async () => {
                         if (!myClub) {
                             alert('로그인이 필요하거나 동아리 정보가 없습니다.');
                             return;
@@ -531,19 +567,20 @@ export default function CollabPage() {
                             app => app.collab_id === selectedCollab!.id && app.applicant_club_id === myClub.id
                         );
                         if (alreadyApplied) {
-                            alert('이미 지원한 협업입니다.');
+                            alert('이미 신청한 협업입니다.');
                             return;
                         }
 
+                        // Local demo state update
                         handleAddApplication({
                             collab_id: selectedCollab!.id,
                             applicant_club_id: myClub.id,
                             applied_at: new Date().toISOString(),
                             status: 'pending',
                         });
-                        alert('지원 완료');
+
+                        alert('신청이 완료되었으며 주최자에게 알림이 전송되었습니다.');
                     }}
-                    onCreateRoom={() => alert('프로젝트 룸 입장 기능 준비중')}
                     isOwnCollab={!!isOwnCollab}
                     onEdit={() => setShowEditModal(true)}
                 />

@@ -46,6 +46,7 @@ export interface Collab {
     region: string;
     budget: string;
     notes?: string;
+    description?: string;
     status: 'open' | 'closed' | 'completed';
     targetType?: TargetType;
     targetSchoolTypes?: SchoolType[];
