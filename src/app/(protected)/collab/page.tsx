@@ -21,7 +21,6 @@ import dynamic from 'next/dynamic';
 
 const CollabModal = dynamic(() => import('@/components/modals/CollabModal').then((mod) => mod.CollabModal));
 const EditCollabModal = dynamic(() => import('@/components/modals/EditCollabModal').then((mod) => mod.EditCollabModal));
-const RatingModal = dynamic(() => import('@/components/modals/RatingModal').then((mod) => mod.RatingModal));
 const Calendar = dynamic(() => import('@/components/ui/calendar').then((mod) => mod.Calendar));
 
 const createId = () =>
@@ -38,9 +37,7 @@ export default function CollabPage() {
     const [typeFilter, setTypeFilter] = useState('all');
     const [regionFilter, setRegionFilter] = useState('all');
     const [selectedCollabId, setSelectedCollabId] = useState<string | null>(null);
-    // const [showNewModal, setShowNewModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [showRatingModal, setShowRatingModal] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
     const [myEvents, setMyEvents] = useState<any[]>([]);
     const [selectedEventForApplicants, setSelectedEventForApplicants] = useState<any | null>(null);
@@ -203,39 +200,6 @@ export default function CollabPage() {
             applications: [...state.applications, { ...app, id: createId() }]
         });
         setSelectedCollabId(null);
-    };
-
-    const handleAddRating = async (collab_id: string, ratings: { clubId: string; rating: number }[]) => {
-        try {
-            const res = await fetch('/api/club/rate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ collabId: collab_id, ratings }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                // Update local state just for UI responsiveness
-                const newRatings = ratings.map(r => ({ collab_id, rated_club_id: r.clubId, rating: r.rating, rated_at: new Date().toISOString() }));
-                updateState({
-                    ...state,
-                    ratings: [...state.ratings, ...newRatings]
-                });
-            } else {
-                alert(data.message || '평가 제출 중 오류가 발생했습니다.');
-            }
-        } catch (error) {
-            console.error('Failed to submit ratings:', error);
-            alert('시스템 오류가 발생했습니다.');
-        }
-    };
-
-    const getApplicantClubs = (): Club[] => {
-        if (!selectedCollab) return [];
-        const applications = state.applications || [];
-        const applicantIds = applications
-            .filter(app => app.collab_id === selectedCollab.id && app.status === 'accepted')
-            .map(app => app.applicant_club_id);
-        return state.clubs.filter(c => applicantIds.includes(c.id));
     };
 
 
@@ -555,7 +519,7 @@ export default function CollabPage() {
                 <CollabModal
                     collab={selectedCollab}
                     club={collabClub || (selectedCollab as any)?.virtualClub}
-                    open={!!selectedCollabId && !showEditModal && !showRatingModal && !selectedEventForApplicants}
+                    open={!!selectedCollabId && !showEditModal && !selectedEventForApplicants}
                     onOpenChange={(open) => !open && setSelectedCollabId(null)}
                     onApply={() => {
                         if (!myClub) {
@@ -579,33 +543,18 @@ export default function CollabPage() {
                         });
                         alert('지원 완료');
                     }}
-                    onCreateRoom={() => isOwnCollab ? setShowRatingModal(true) : alert('프로젝트 룸 입장 (Demo)')}
+                    onCreateRoom={() => alert('프로젝트 룸 입장 기능 준비중')}
                     isOwnCollab={!!isOwnCollab}
                     onEdit={() => setShowEditModal(true)}
                 />
 
                 {selectedCollab && (
-                    <>
-                        <EditCollabModal
-                            collab={selectedCollab}
-                            open={showEditModal}
-                            onOpenChange={setShowEditModal}
-                            onSubmit={(data) => handleUpdateCollab(selectedCollab.id, data)}
-                        />
-
-                        <RatingModal
-                            collab={selectedCollab}
-                            clubs={getApplicantClubs()}
-                            open={showRatingModal}
-                            onOpenChange={setShowRatingModal}
-                            onSubmitRatings={async (ratings) => {
-                                await handleAddRating(selectedCollab.id, ratings);
-                                setShowRatingModal(false);
-                                setSelectedCollabId(null);
-                                alert('평가 완료');
-                            }}
-                        />
-                    </>
+                    <EditCollabModal
+                        collab={selectedCollab}
+                        open={showEditModal}
+                        onOpenChange={setShowEditModal}
+                        onSubmit={(data) => handleUpdateCollab(selectedCollab.id, data)}
+                    />
                 )}
 
                 {/* Applicant List Modal */}
