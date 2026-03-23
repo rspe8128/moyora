@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import SchoolNameInput from '@/components/ui/SchoolNameInput'
 
 // 3D Removed
 
@@ -34,7 +35,6 @@ export default function ClubRegisterPage() {
         description: '',
         location: '',
         meetingTime: '',
-        recruitStatus: 'open', // open, close
         contactPhone: '',
         maxMembers: ''
     });
@@ -165,13 +165,15 @@ export default function ClubRegisterPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="schoolName">학교명 <span className="text-destructive">*</span></Label>
-                                    <Input
+                                    <SchoolNameInput
                                         id="schoolName"
                                         name="schoolName"
-                                        placeholder="예: 서울과학고등학교"
                                         value={formData.schoolName}
-                                        onChange={handleChange}
-                                        className={errors.schoolName ? "border-destructive" : ""}
+                                        onChange={(val) => {
+                                            setFormData(prev => ({ ...prev, schoolName: val }));
+                                            if (errors.schoolName) setErrors(prev => { const e = {...prev}; delete e.schoolName; return e; });
+                                        }}
+                                        hasError={!!errors.schoolName}
                                     />
                                     {errors.schoolName && <p className="text-xs text-destructive">{errors.schoolName}</p>}
                                 </div>
@@ -266,19 +268,7 @@ export default function ClubRegisterPage() {
                                         onChange={handleChange}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="recruitStatus">모집(면접) 상태</Label>
-                                    <select
-                                        id="recruitStatus"
-                                        name="recruitStatus"
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={formData.recruitStatus}
-                                        onChange={handleChange}
-                                    >
-                                        <option value="open">모집 중 (면접 가능)</option>
-                                        <option value="close">모집 마감</option>
-                                    </select>
-                                </div>
+
                             </div>
 
                             <div className="pt-6 flex gap-4 justify-end">

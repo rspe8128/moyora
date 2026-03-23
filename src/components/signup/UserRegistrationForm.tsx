@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
+import SchoolNameInput from '@/components/ui/SchoolNameInput';
 
 interface IdentityData {
     name?: string;
@@ -48,7 +49,6 @@ export default function UserRegistrationForm({ identityData, studentIdData }: Us
         const { name, value } = e.target;
         setFormData((prev) => {
             const newData = { ...prev, [name]: value };
-            // Automatically set schoolId to match schoolName if that's what's changing
             if (name === 'schoolName') {
                 newData.schoolId = value;
             }
@@ -60,6 +60,13 @@ export default function UserRegistrationForm({ identityData, studentIdData }: Us
                 delete newErrors[name];
                 return newErrors;
             });
+        }
+    };
+
+    const handleSchoolChange = (value: string) => {
+        setFormData((prev) => ({ ...prev, schoolName: value, schoolId: value }));
+        if (errors.schoolName) {
+            setErrors((prev) => { const e = { ...prev }; delete e.schoolName; return e; });
         }
     };
 
@@ -205,13 +212,12 @@ export default function UserRegistrationForm({ identityData, studentIdData }: Us
 
                         <div className="space-y-2">
                             <Label htmlFor="schoolName">학교명</Label>
-                            <Input
+                            <SchoolNameInput
                                 id="schoolName"
                                 name="schoolName"
-                                value={formData.schoolName}
-                                onChange={handleChange}
-                                className={errors.schoolName ? 'border-destructive focus-visible:ring-destructive' : 'bg-background'}
-                                placeholder="학교명을 입력해주세요"
+                                value={formData.schoolName || ''}
+                                onChange={handleSchoolChange}
+                                hasError={!!errors.schoolName}
                             />
                             {errors.schoolName && <p className="text-xs text-destructive">{errors.schoolName}</p>}
                         </div>

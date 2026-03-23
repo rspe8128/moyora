@@ -103,8 +103,7 @@ export async function POST(request: NextRequest) {
             contactPhone,
             location,
             meetingTime,
-            maxMembers,
-            recruitStatus
+            maxMembers
         } = validationResult.data;
 
         // Map form fields to DB schema
@@ -139,7 +138,6 @@ export async function POST(request: NextRequest) {
             location,
             meetingTime,
             maxMembers: maxMembers === '' ? undefined : maxMembers, // Handle empty string if coerce allowed it or casted
-            recruitStatus,
             userId: userSession.id,
         });
 

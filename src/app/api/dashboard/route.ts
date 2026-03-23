@@ -10,176 +10,173 @@ export async function GET() {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
-            return NextResponse.json(
-                { success: false, message: '로그인이 필요합니다' },
-                { status: 401 }
-            );
+            return NextResponse.json({ success: false, message: '로그인이 필요합니다' }, { status: 401 });
         }
 
         const userSession = session.user as { schoolId?: string; id?: string; email?: string };
         if (!userSession.schoolId) {
-            return NextResponse.json(
-                { success: false, message: '학교 정보가 없습니다. 다시 로그인해주세요.' },
-                { status: 403 }
-            );
+            return NextResponse.json({ success: false, message: '학교 정보가 없습니다. 다시 로그인해주세요.' }, { status: 403 });
         }
 
         await connectDB();
 
+        // Only fetch necessary fields from user doc
         const user = await User.findOne({
             email: userSession.email,
-            schoolId: userSession.schoolId
-        }).select('-password');
+            schoolId: userSession.schoolId,
+        }).select('_id name email schoolName role').lean() as any;
 
         if (!user) {
-            return NextResponse.json(
-                { success: false, message: '사용자를 찾을 수 없습니다' },
-                { status: 404 }
-            );
+            return NextResponse.json({ success: false, message: '사용자를 찾을 수 없습니다' }, { status: 404 });
         }
 
-        // Run independent queries in parallel
+        const now = new Date();
+
+        // ── Batch 1: All independent queries in parallel ──────────────────────
         const [
             clubAssociations,
             hostedContests,
             hostedForums,
             hostedCoResearch,
-            participations,
+            participationsRaw,
             notificationsRaw,
-            recentClubsRaw,
             upcomingContests,
             upcomingForums,
-            upcomingResearch
+            upcomingResearch,
         ] = await Promise.all([
-            // 1. Clubs
-            ClubMember.find({
-                userId: user._id,
-                schoolId: userSession.schoolId
-            }).populate('clubId').lean(),
+            // 1. User's club memberships
+            ClubMember.find({ userId: user._id, schoolId: userSession.schoolId })
+                .populate({ path: 'clubId', select: '_id clubName schoolName clubTheme trustScore' })
+                .lean(),
 
-            // 2. Hosted Events
-            Contest.find({ userId: user._id, schoolId: userSession.schoolId }).lean(),
-            Forum.find({ userId: user._id, schoolId: userSession.schoolId }).lean(),
-            CoResearch.find({ userId: user._id, schoolId: userSession.schoolId }).lean(),
+            // 2. Events hosted by user (only needed fields)
+            Contest.find({ userId: user._id, schoolId: userSession.schoolId })
+                .select('_id contestName contestDate contestPlace').lean(),
+            Forum.find({ userId: user._id, schoolId: userSession.schoolId })
+                .select('_id forumName forumDate forumPlace').lean(),
+            CoResearch.find({ userId: user._id, schoolId: userSession.schoolId })
+                .select('_id researchName researchDate researchPlace').lean(),
 
-            // 3. Participations (Raw)
-            Participant.find({
-                userId: user._id,
-                schoolId: userSession.schoolId
-            }).lean(),
+            // 3. User's participations (only needed fields)
+            // BUG FIX: Participant doesn't have schoolId field — removed it
+            Participant.find({ userId: user._id })
+                .select('_id eventType eventId status').lean(),
 
             // 4. Notifications
-            Notification.find({
-                userId: user._id,
-                schoolId: userSession.schoolId,
-                isRead: false,
-            }).sort({ createdAt: -1 }).limit(10).lean(),
+            // BUG FIX: Notification doesn't have schoolId field — removed it from query
+            Notification.find({ userId: user._id, isRead: false })
+                .sort({ createdAt: -1 }).limit(10).select('_id eventName eventDate daysUntil isRead').lean(),
 
-            // 5. Global Recent Clubs
-            Club.find({}).sort({ createdAt: -1 }).limit(4).lean(),
-
-            // 6. Global Recent Events
-            Contest.find({ contestDate: { $gte: new Date().toISOString() } }).sort({ contestDate: 1 }).limit(3).lean(),
-            Forum.find({ forumDate: { $gte: new Date().toISOString() } }).sort({ forumDate: 1 }).limit(3).lean(),
-            CoResearch.find({ researchDate: { $gte: new Date().toISOString() } }).sort({ researchDate: 1 }).limit(3).lean()
+            // 5. Global upcoming events (for "active clubs" + "trending collabs")
+            Contest.find({ contestDate: { $gte: now } })
+                .sort({ contestDate: 1 }).limit(6)
+                .select('_id contestName contestPlace contestDate userId').lean(),
+            Forum.find({ forumDate: { $gte: now } })
+                .sort({ forumDate: 1 }).limit(6)
+                .select('_id forumName forumPlace forumDate userId').lean(),
+            CoResearch.find({ researchDate: { $gte: now } })
+                .sort({ researchDate: 1 }).limit(6)
+                .select('_id researchName researchPlace researchDate userId').lean(),
         ]);
 
-        // Process Clubs
-        const clubs = clubAssociations.map((assoc: any) => ({
-            ...assoc.clubId,
-            role: assoc.role
-        })).filter((c: any) => c._id);
+        // ── Process clubs ────────────────────────────────────────────────────
+        const clubs = (clubAssociations as any[])
+            .map((assoc) => ({ ...(assoc.clubId || {}), role: assoc.role }))
+            .filter((c) => c._id);
 
-        // Process Hosted Events
+        // User's club themes for recommendation scoring
+        const userThemes = new Set(clubs.map((c: any) => c.clubTheme).filter(Boolean));
+
+        // ── Process hosted events ────────────────────────────────────────────
         const hostedEvents = [
-            ...hostedContests.map((e: any) => ({
-                _id: e._id,
-                eventType: 'contest' as const,
-                eventName: e.contestName,
-                eventDate: e.contestDate,
-                eventPlace: e.contestPlace,
-            })),
-            ...hostedForums.map((e: any) => ({
-                _id: e._id,
-                eventType: 'forum' as const,
-                eventName: e.forumName,
-                eventDate: e.forumDate,
-                eventPlace: e.forumPlace,
-            })),
-            ...hostedCoResearch.map((e: any) => ({
-                _id: e._id,
-                eventType: 'co-research' as const,
-                eventName: e.researchName,
-                eventDate: e.researchDate,
-                eventPlace: e.researchPlace,
-            })),
+            ...(hostedContests as any[]).map((e) => ({ _id: e._id, eventType: 'contest' as const, eventName: e.contestName, eventDate: e.contestDate, eventPlace: e.contestPlace })),
+            ...(hostedForums as any[]).map((e) => ({ _id: e._id, eventType: 'forum' as const, eventName: e.forumName, eventDate: e.forumDate, eventPlace: e.forumPlace })),
+            ...(hostedCoResearch as any[]).map((e) => ({ _id: e._id, eventType: 'co-research' as const, eventName: e.researchName, eventDate: e.researchDate, eventPlace: e.researchPlace })),
         ].sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
 
-        // Process Dependent Data
         const hostedEventIds = hostedEvents.map((e) => e._id.toString());
-        const pendingParticipantsCount = await Participant.countDocuments({
-            eventId: { $in: hostedEventIds },
-            status: 'pending',
-        });
 
-        // Enrich Participations (Optimized with batch fetching)
-        const contestIds = participations
-            .filter((p: any) => p.eventType === 'contest')
-            .map((p: any) => p.eventId);
-        const forumIds = participations
-            .filter((p: any) => p.eventType === 'forum')
-            .map((p: any) => p.eventId);
-        const researchIds = participations
-            .filter((p: any) => p.eventType === 'co-research')
-            .map((p: any) => p.eventId);
+        // IDs for participation enrichment
+        const contestIds = (participationsRaw as any[]).filter((p) => p.eventType === 'contest').map((p) => p.eventId);
+        const forumIds = (participationsRaw as any[]).filter((p) => p.eventType === 'forum').map((p) => p.eventId);
+        const researchIds = (participationsRaw as any[]).filter((p) => p.eventType === 'co-research').map((p) => p.eventId);
 
-        const [contests, forums, researches] = await Promise.all([
-            contestIds.length > 0 ? Contest.find({ _id: { $in: contestIds } }).lean() : Promise.resolve([]),
-            forumIds.length > 0 ? Forum.find({ _id: { $in: forumIds } }).lean() : Promise.resolve([]),
-            researchIds.length > 0 ? CoResearch.find({ _id: { $in: researchIds } }).lean() : Promise.resolve([]),
+        // ── Batch 2: Dependent queries in parallel ────────────────────────────
+        const [pendingParticipantsCount, contests, forums, researches] = await Promise.all([
+            hostedEventIds.length > 0
+                ? Participant.countDocuments({ eventId: { $in: hostedEventIds }, status: 'pending' })
+                : Promise.resolve(0),
+            contestIds.length > 0
+                ? Contest.find({ _id: { $in: contestIds } }).select('_id contestName contestDate contestPlace').lean()
+                : Promise.resolve([]),
+            forumIds.length > 0
+                ? Forum.find({ _id: { $in: forumIds } }).select('_id forumName forumDate forumPlace').lean()
+                : Promise.resolve([]),
+            researchIds.length > 0
+                ? CoResearch.find({ _id: { $in: researchIds } }).select('_id researchName researchDate researchPlace').lean()
+                : Promise.resolve([]),
         ]);
 
+        // ── Enrich participations ─────────────────────────────────────────────
         const contestMap = new Map((contests as any[]).map((c) => [c._id.toString(), c]));
         const forumMap = new Map((forums as any[]).map((f) => [f._id.toString(), f]));
         const researchMap = new Map((researches as any[]).map((r) => [r._id.toString(), r]));
 
-        const participationsWithDetails = participations.map((p: any) => {
-            let eventName = '';
-            let eventDate = null;
-            let eventPlace = '';
-
+        const participationsWithDetails = (participationsRaw as any[]).map((p) => {
+            let eventName = '', eventDate = null, eventPlace = '';
             if (p.eventType === 'contest') {
-                const contest = contestMap.get(p.eventId.toString());
-                if (contest) {
-                    eventName = contest.contestName;
-                    eventDate = contest.contestDate;
-                    eventPlace = contest.contestPlace;
-                }
+                const c = contestMap.get(p.eventId.toString());
+                if (c) { eventName = c.contestName; eventDate = c.contestDate; eventPlace = c.contestPlace; }
             } else if (p.eventType === 'forum') {
-                const forum = forumMap.get(p.eventId.toString());
-                if (forum) {
-                    eventName = forum.forumName;
-                    eventDate = forum.forumDate;
-                    eventPlace = forum.forumPlace;
-                }
+                const f = forumMap.get(p.eventId.toString());
+                if (f) { eventName = f.forumName; eventDate = f.forumDate; eventPlace = f.forumPlace; }
             } else if (p.eventType === 'co-research') {
-                const research = researchMap.get(p.eventId.toString());
-                if (research) {
-                    eventName = research.researchName;
-                    eventDate = research.researchDate;
-                    eventPlace = research.researchPlace;
-                }
+                const r = researchMap.get(p.eventId.toString());
+                if (r) { eventName = r.researchName; eventDate = r.researchDate; eventPlace = r.researchPlace; }
             }
-
-            return {
-                ...p,
-                eventName,
-                eventDate,
-                eventPlace,
-            };
+            return { ...p, eventName, eventDate, eventPlace };
         });
 
-        const notifications = notificationsRaw || [];
+        // ── "Active clubs" (clubs currently running upcoming events) ──────────
+        const activeHostIds = [
+            ...(upcomingContests as any[]).map((e) => e.userId.toString()),
+            ...(upcomingForums as any[]).map((e) => e.userId.toString()),
+            ...(upcomingResearch as any[]).map((e) => e.userId.toString()),
+        ];
+        const uniqueActiveHostIds = [...new Set(activeHostIds)];
+
+        const activeClubsRaw = uniqueActiveHostIds.length > 0
+            ? await Club.find({ userId: { $in: uniqueActiveHostIds } })
+                .limit(4)
+                .select('_id clubName schoolName clubTheme trustScore userId')
+                .lean() as any[]
+            : [];
+
+        // ── Trending collabs — sorted by theme match, then by date ────────────
+        // Map: hostUserId → clubTheme (from activeClubsRaw)
+        const hostThemeMap = new Map<string, string>();
+        activeClubsRaw.forEach((club) => {
+            if (club.userId) hostThemeMap.set(club.userId.toString(), club.clubTheme || '');
+        });
+
+        const allUpcoming = [
+            ...(upcomingContests as any[]).map((e) => ({ _id: e._id, title: e.contestName, host: e.contestPlace || 'Online', date: e.contestDate, type: 'contest', userId: e.userId.toString() })),
+            ...(upcomingForums as any[]).map((e) => ({ _id: e._id, title: e.forumName, host: e.forumPlace || 'Online', date: e.forumDate, type: 'forum', userId: e.userId.toString() })),
+            ...(upcomingResearch as any[]).map((e) => ({ _id: e._id, title: e.researchName, host: e.researchPlace || 'Online', date: e.researchDate, type: 'co-research', userId: e.userId.toString() })),
+        ];
+
+        const trendingCollabs = allUpcoming
+            .sort((a, b) => {
+                // Score: +2 if same theme, +1 if partial keyword overlap
+                const aTheme = hostThemeMap.get(a.userId) || '';
+                const bTheme = hostThemeMap.get(b.userId) || '';
+                const aScore = userThemes.has(aTheme) ? 2 : [...userThemes].some((t) => aTheme.includes(t as string) || (t as string).includes(aTheme)) ? 1 : 0;
+                const bScore = userThemes.has(bTheme) ? 2 : [...userThemes].some((t) => bTheme.includes(t as string) || (t as string).includes(bTheme)) ? 1 : 0;
+                if (aScore !== bScore) return bScore - aScore;
+                return new Date(a.date).getTime() - new Date(b.date).getTime();
+            })
+            .slice(0, 4)
+            .map(({ userId, ...rest }) => rest); // Strip internal userId from response
 
         return NextResponse.json({
             success: true,
@@ -193,44 +190,23 @@ export async function GET() {
                 clubs,
                 hostedEvents,
                 participations: participationsWithDetails,
-                notifications,
+                notifications: notificationsRaw || [],
                 stats: {
                     clubCount: clubs.length,
                     hostedEventCount: hostedEvents.length,
-                    participationCount: participations.length,
+                    participationCount: participationsRaw.length,
                     pendingApprovalCount: pendingParticipantsCount,
-                    unreadNotificationCount: notifications.length,
+                    unreadNotificationCount: (notificationsRaw || []).length,
                 },
-                recentClubs: recentClubsRaw.map((c: any) => ({
+                // "현재 프로젝트 진행 중인 동아리" instead of recently registered
+                activeClubs: activeClubsRaw.map((c) => ({
                     _id: c._id,
                     name: c.clubName,
                     school: c.schoolName,
-                    desc: c.category || 'General',
-                    score: typeof c.trustScore === 'number' ? c.trustScore : 70
+                    desc: c.clubTheme || 'General',
+                    score: typeof c.trustScore === 'number' ? c.trustScore : 70,
                 })),
-                trendingCollabs: [
-                    ...upcomingContests.map((e: any) => ({
-                        _id: e._id,
-                        title: e.contestName,
-                        host: e.contestPlace || 'Online',
-                        date: e.contestDate,
-                        type: 'contest'
-                    })),
-                    ...upcomingForums.map((e: any) => ({
-                        _id: e._id,
-                        title: e.forumName,
-                        host: e.forumPlace || 'Online',
-                        date: e.forumDate,
-                        type: 'forum'
-                    })),
-                    ...upcomingResearch.map((e: any) => ({
-                        _id: e._id,
-                        title: e.researchName,
-                        host: e.researchPlace || 'Online',
-                        date: e.researchDate,
-                        type: 'co-research'
-                    }))
-                ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 4)
+                trendingCollabs,
             },
         });
     } catch (error) {
@@ -241,4 +217,3 @@ export async function GET() {
         );
     }
 }
-

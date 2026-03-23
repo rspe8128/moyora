@@ -65,7 +65,7 @@ const NotificationSchema = new Schema<INotification>(
 
 // Indexes for efficient queries
 NotificationSchema.index({ userId: 1, isRead: 1 });
-NotificationSchema.index({ userId: 1, createdAt: -1 });
+NotificationSchema.index({ userId: 1, schoolId: 1, isRead: 1, createdAt: -1 });
 // Prevent duplicate notifications
 NotificationSchema.index(
     { userId: 1, eventId: 1, daysUntil: 1 },

@@ -63,7 +63,7 @@ export default function NavBar({ showDashboardLink = true }: NavBarProps) {
             <div className="container flex h-16 items-center">
                 <div className="mr-8 flex items-center gap-2">
                     <Link href={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-2 font-bold">
-                        <Image src="/moyora.svg" alt="Moyora Logo" width={32} height={32} className="rounded-lg" />
+                        <Image src="/moyora_logo-removebg-preview.png" alt="Moyora Logo" width={32} height={32} className="rounded-lg" />
                         <span className="text-xl">모여라</span>
                     </Link>
                 </div>

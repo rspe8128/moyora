@@ -15,7 +15,6 @@ export interface IClub extends Document {
     location?: string;
     meetingTime?: string;
     maxMembers?: number;
-    recruitStatus: 'open' | 'close';
     trustScore: number;
     trustCount: number;
     createdAt: Date;
@@ -37,7 +36,7 @@ const ClubSchema = new Schema<IClub>(
         schoolId: {
             type: String,
             required: [true, '학교 고유 ID가 필요합니다'],
-},
+        },
         clubTheme: {
             type: String,
             required: [true, '동아리 분야를 입력해주세요'],
@@ -84,11 +83,6 @@ const ClubSchema = new Schema<IClub>(
         maxMembers: {
             type: Number,
         },
-        recruitStatus: {
-            type: String,
-            enum: ['open', 'close'],
-            default: 'open',
-        },
         trustScore: {
             type: Number,
             default: 70,
@@ -111,8 +105,8 @@ ClubSchema.index({ userId: 1 });
 ClubSchema.index({ schoolId: 1 });
 ClubSchema.index({ schoolName: 1 });
 ClubSchema.index({ clubName: 'text', clubTheme: 'text' });
+ClubSchema.index({ createdAt: -1 });
 
 const Club: Model<IClub> = mongoose.models.Club || mongoose.model<IClub>('Club', ClubSchema);
 
 export default Club;
-

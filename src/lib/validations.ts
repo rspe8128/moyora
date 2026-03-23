@@ -68,7 +68,6 @@ export const clubSchema = z.object({
     location: z.string().optional(),
     meetingTime: z.string().optional(),
     maxMembers: z.coerce.number().optional().or(z.literal('')),
-    recruitStatus: z.enum(['open', 'close']).optional(),
 
     // Legacy fields (optional now, derived from session/input mappings)
     presidentName: z.string().optional(),

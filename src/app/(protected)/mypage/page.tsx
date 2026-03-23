@@ -6,6 +6,7 @@ import NavBar from '@/components/NavBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import SchoolNameInput from '@/components/ui/SchoolNameInput';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Card,
@@ -243,12 +244,14 @@ export default function MyPage() {
 
                                     <div className="space-y-2">
                                         <Label htmlFor="school">소속 학교</Label>
-                                        <Input
+                                        <SchoolNameInput
                                             id="school"
-                                            type="text"
                                             value={profileForm.schoolName}
-                                            onChange={(e) => setProfileForm({ ...profileForm, schoolName: e.target.value })}
-                                            className={profileErrors.schoolName ? 'border-destructive' : ''}
+                                            onChange={(val) => {
+                                                setProfileForm({ ...profileForm, schoolName: val });
+                                                if (profileErrors.schoolName) setProfileErrors(prev => { const e = {...prev}; delete e.schoolName; return e; });
+                                            }}
+                                            hasError={!!profileErrors.schoolName}
                                         />
                                         {profileErrors.schoolName && <p className="text-xs text-destructive">{profileErrors.schoolName}</p>}
                                     </div>

@@ -9,7 +9,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Calendar, Users, Trophy, ChevronRight, ArrowRight, Star, TrendingUp } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from '@/components/ui/dialog';
+import { Calendar, Users, Trophy, ChevronRight, Star, TrendingUp, MapPin, Clock, ArrowRight } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 // --- Interfaces ---
@@ -64,7 +71,7 @@ interface DashboardData {
         pendingApprovalCount: number;
         unreadNotificationCount: number;
     };
-    recentClubs: Array<{
+    activeClubs: Array<{
         _id: string;
         name: string;
         school: string;
@@ -80,10 +87,35 @@ interface DashboardData {
     }>;
 }
 
+// Combines hosted events + approved participations as "my projects"
+type ProjectItem = {
+    _id: string;
+    title: string;
+    date: string;
+    place: string;
+    type: 'contest' | 'forum' | 'co-research';
+    role: 'host' | 'participant';
+};
+
+function getEventTypeLabel(type: string) {
+    if (type === 'contest') return '대회';
+    if (type === 'forum') return '포럼';
+    if (type === 'co-research') return '공동연구';
+    return type;
+}
+
+function getEventTypeColor(type: string) {
+    if (type === 'contest') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+    if (type === 'forum') return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+    if (type === 'co-research') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
+    return 'bg-muted text-muted-foreground';
+}
+
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
 
     useEffect(() => {
         if (status === 'authenticated') {
@@ -104,6 +136,28 @@ export default function DashboardPage() {
             setIsLoading(false);
         }
     };
+
+    // Build "projects" from hosted events + approved participations
+    const projects: ProjectItem[] = dashboardData ? [
+        ...dashboardData.hostedEvents.map((e) => ({
+            _id: e._id,
+            title: e.eventName,
+            date: e.eventDate,
+            place: e.eventPlace,
+            type: e.eventType,
+            role: 'host' as const,
+        })),
+        ...dashboardData.participations
+            .filter((p) => p.status === 'approved')
+            .map((p) => ({
+                _id: p._id,
+                title: p.eventName,
+                date: p.eventDate,
+                place: p.eventPlace,
+                type: p.eventType,
+                role: 'participant' as const,
+            })),
+    ] : [];
 
     if (status === 'loading' || isLoading) {
         return <DashboardSkeleton />;
@@ -161,52 +215,42 @@ export default function DashboardPage() {
                             <Link href="/projects">전체 보기 <ChevronRight className="ml-1 h-4 w-4" /></Link>
                         </Button>
                     </div>
-                    <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-                        <div className="flex w-max space-x-4 p-4">
-                            {/* Mock Data for visual matching */}
-                            <ProjectCard
-                                title="전국 BM 케이스 스프린트"
-                                team="PRAGMATISM, Quant Forge"
-                                progress={48}
-                                status="진행 48%"
-                            />
-                            <ProjectCard
-                                title="환경 데이터 수집 봉사 + 리포트"
-                                team="BioEdge, S2 Lab"
-                                progress={26}
-                                status="진행 26%"
-                            />
-                            <ProjectCard
-                                title="AI 안전/윤리? 대신 시스템 리스크"
-                                team="S2 Lab"
-                                progress={10}
-                                status="진행 10%"
-                            />
-                            <ProjectCard
-                                title="무대기술 교류전: 조명/음향"
-                                team="StageCraft"
-                                progress={90}
-                                status="마무리 단계"
-                            />
+
+                    {projects.length > 0 ? (
+                        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+                            <div className="flex w-max space-x-4 p-4">
+                                {projects.map((project) => (
+                                    <ProjectCard
+                                        key={project._id}
+                                        project={project}
+                                        onClick={() => setSelectedProject(project)}
+                                    />
+                                ))}
+                            </div>
+                            <ScrollBar orientation="horizontal" />
+                        </ScrollArea>
+                    ) : (
+                        <div className="rounded-md border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
+                            아직 진행 중인 프로젝트가 없습니다.{' '}
+                            <Link href="/collab" className="text-primary underline-offset-4 hover:underline">협업 탐색하기</Link>
                         </div>
-                        <ScrollBar orientation="horizontal" />
-                    </ScrollArea>
+                    )}
                 </div>
 
                 {/* 4. Layout Grid for Recent & Trending */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                    {/* Recent Clubs */}
+                    {/* Active Clubs (currently running projects) */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold tracking-tight">최근 등록 동아리</h2>
+                            <h2 className="text-xl font-bold tracking-tight">프로젝트 중인 동아리</h2>
                             <Button variant="ghost" className="text-sm font-medium" asChild>
                                 <Link href="/club/search">전체 보기</Link>
                             </Button>
                         </div>
                         <div className="space-y-3">
-                            {dashboardData?.recentClubs?.length ? (
-                                dashboardData.recentClubs.map((club) => (
+                            {dashboardData?.activeClubs?.length ? (
+                                dashboardData.activeClubs.map((club) => (
                                     <RecentClubCard
                                         key={club._id}
                                         id={club._id}
@@ -217,7 +261,7 @@ export default function DashboardPage() {
                                     />
                                 ))
                             ) : (
-                                <p className="text-sm text-muted-foreground">최근 등록된 동아리가 없습니다.</p>
+                                <p className="text-sm text-muted-foreground">현재 프로젝트를 진행 중인 동아리가 없습니다.</p>
                             )}
                         </div>
                     </div>
@@ -250,7 +294,85 @@ export default function DashboardPage() {
                 </div>
 
             </main>
+
+            {/* Project Detail Modal */}
+            <ProjectDetailModal
+                project={selectedProject}
+                onClose={() => setSelectedProject(null)}
+            />
         </div>
+    );
+}
+
+// --- Project Detail Modal ---
+function ProjectDetailModal({ project, onClose }: { project: ProjectItem | null; onClose: () => void }) {
+    if (!project) return null;
+
+    const isPast = new Date(project.date) < new Date();
+    const dateStr = project.date ? new Date(project.date).toLocaleDateString('ko-KR', {
+        year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+    }) : '날짜 미정';
+
+    const collabUrl =
+        project.role === 'host'
+            ? `/events/${project.type}/manage`
+            : `/collab`;
+
+    return (
+        <Dialog open={!!project} onOpenChange={(open) => { if (!open) onClose(); }}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Badge className={cn('text-xs font-medium border-0', getEventTypeColor(project.type))}>
+                            {getEventTypeLabel(project.type)}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                            {project.role === 'host' ? '주최' : '참가'}
+                        </Badge>
+                    </div>
+                    <DialogTitle className="text-xl leading-snug">{project.title}</DialogTitle>
+                    <DialogDescription className="sr-only">프로젝트 세부사항</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 pt-2">
+                    <div className="rounded-xl border bg-muted/30 divide-y">
+                        <div className="flex items-center gap-3 px-4 py-3">
+                            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div>
+                                <p className="text-xs text-muted-foreground">날짜</p>
+                                <p className="text-sm font-medium">{dateStr}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-3">
+                            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div>
+                                <p className="text-xs text-muted-foreground">장소</p>
+                                <p className="text-sm font-medium">{project.place || '미정'}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 px-4 py-3">
+                            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div>
+                                <p className="text-xs text-muted-foreground">상태</p>
+                                <p className={cn('text-sm font-medium', isPast ? 'text-muted-foreground' : 'text-green-600 dark:text-green-400')}>
+                                    {isPast ? '종료됨' : '진행 중'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                        <Button className="flex-1" asChild>
+                            <Link href={collabUrl}>
+                                {project.role === 'host' ? '관리 페이지로' : '협업 탐색으로'}
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
+                        <Button variant="outline" onClick={onClose}>닫기</Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -277,28 +399,36 @@ function StatsCard({ title, value, subtext, icon }: { title: string, value: stri
     );
 }
 
-function ProjectCard({ title, team, progress, status }: { title: string, team: string, progress: number, status: string }) {
+function ProjectCard({ project, onClick }: { project: ProjectItem; onClick: () => void }) {
+    const isPast = new Date(project.date) < new Date();
     return (
-        <Link href="/collab?tab=projects" className="inline-block">
-            <Card className="w-[300px] whitespace-normal shadow-sm hover:shadow-md transition-all cursor-pointer border-l-4 border-l-primary/40">
+        <button
+            onClick={onClick}
+            className="inline-block text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+        >
+            <Card className="w-[300px] whitespace-normal shadow-sm hover:shadow-md transition-all cursor-pointer border-l-4 border-l-primary/40 hover:border-l-primary">
                 <CardContent className="p-5 space-y-4">
                     <div className="space-y-1">
-                        <h3 className="font-semibold leading-tight line-clamp-1">{title}</h3>
-                        <p className="text-xs text-muted-foreground line-clamp-1">참여: {team}</p>
+                        <Badge className={cn('text-[10px] border-0 mb-1', getEventTypeColor(project.type))}>
+                            {getEventTypeLabel(project.type)}
+                        </Badge>
+                        <h3 className="font-semibold leading-tight line-clamp-2">{project.title}</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                            {project.role === 'host' ? '주최' : '참가'} · {project.place || '장소 미정'}
+                        </p>
                     </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-xs items-center">
-                            <span className="text-muted-foreground">진척도</span>
-                            <Badge variant="secondary" className="text-[10px] h-5">{status}</Badge>
-                        </div>
-                        <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                            <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
-                        </div>
+                    <div className="flex justify-between text-xs items-center">
+                        <span className="text-muted-foreground">
+                            {project.date ? new Date(project.date).toLocaleDateString('ko-KR') : '날짜 미정'}
+                        </span>
+                        <Badge variant="secondary" className={cn('text-[10px] h-5', isPast ? 'opacity-60' : '')}>
+                            {isPast ? '종료' : '진행 중'}
+                        </Badge>
                     </div>
                 </CardContent>
             </Card>
-        </Link>
-    )
+        </button>
+    );
 }
 
 function RecentClubCard({ id, name, school, desc, score }: { id: string, name: string, school: string, desc: string, score: number }) {

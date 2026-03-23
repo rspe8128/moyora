@@ -64,6 +64,8 @@ const ParticipantSchema = new Schema<IParticipant>(
 // Compound index to prevent duplicate participation
 ParticipantSchema.index({ userId: 1, eventType: 1, eventId: 1 }, { unique: true });
 ParticipantSchema.index({ eventType: 1, eventId: 1 });
+ParticipantSchema.index({ userId: 1, schoolId: 1 });
+ParticipantSchema.index({ eventId: 1, status: 1 });
 
 const Participant: Model<IParticipant> =
     mongoose.models.Participant || mongoose.model<IParticipant>('Participant', ParticipantSchema);

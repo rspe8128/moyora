@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Camera, RefreshCw, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
+import SchoolNameInput from '@/components/ui/SchoolNameInput';
 
 interface StudentIDScannerProps {
     onComplete: (data: { schoolName: string; studentName: string; rawText: string }) => void;
@@ -281,10 +282,10 @@ export default function StudentIDScanner({ onComplete }: StudentIDScannerProps) 
                         <div className="space-y-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="school">학교명</Label>
-                                <Input
+                                <SchoolNameInput
                                     id="school"
                                     value={scannedData.schoolName}
-                                    onChange={(e) => setScannedData({ ...scannedData, schoolName: e.target.value })}
+                                    onChange={(val) => setScannedData({ ...scannedData, schoolName: val })}
                                     placeholder="인식되지 않음 (직접 입력)"
                                 />
                             </div>
