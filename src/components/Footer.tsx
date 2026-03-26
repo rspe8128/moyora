@@ -10,7 +10,7 @@ export default function Footer() {
                         <h3 className="text-lg font-bold">프래그머티즘(Pragmatism)</h3>
                         <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                             <p>대표: 조슈아 | 사업자등록번호: 414-24-02372</p>
-                            <p>고객센터: 070-xxxx-xxxx</p>
+                            <p>고객센터: 070-7620-1514</p>
                             <p>E-Mail: 5070joshua@gmail.com</p>
                             <p>주소: 경기도 고양시 일산서구 강선로 71, 712동(주엽동)</p>
                         </div>
