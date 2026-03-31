@@ -84,17 +84,25 @@ export async function GET(request: NextRequest) {
     try {
         await connectDB();
 
-        // Fetch clubs to match with users
-        const clubs = await Club.find();
-        const clubMap = new Map();
-        clubs.forEach((c: IClub) => clubMap.set(c.userId.toString(), c));
-
-        // Fetch all types and merge
+        // Fetch all event types and merge
         const [contests, forums, researches] = await Promise.all([
-            Contest.find().sort({ createdAt: -1 }).populate('userId', 'name schoolName'),
-            Forum.find().sort({ createdAt: -1 }).populate('userId', 'name schoolName'),
-            CoResearch.find().sort({ createdAt: -1 }).populate('userId', 'name schoolName'),
+            Contest.find().sort({ createdAt: -1 }).populate('userId', 'name schoolName').lean(),
+            Forum.find().sort({ createdAt: -1 }).populate('userId', 'name schoolName').lean(),
+            CoResearch.find().sort({ createdAt: -1 }).populate('userId', 'name schoolName').lean(),
         ]);
+
+        // Fetch only clubs to match with the fetched event users
+        const hostIds = new Set<string>();
+        const addHostId = (e: any) => {
+            if (e.userId && e.userId._id) hostIds.add(e.userId._id.toString());
+        };
+        contests.forEach(addHostId);
+        forums.forEach(addHostId);
+        researches.forEach(addHostId);
+
+        const clubs = await Club.find({ userId: { $in: Array.from(hostIds) } }).lean();
+        const clubMap = new Map();
+        clubs.forEach((c: any) => clubMap.set(c.userId.toString(), c));
 
         const formatItem = (item: any, type: string, titleField: string, dateField: string, placeField: string) => {
             const userId = item.userId?._id?.toString();

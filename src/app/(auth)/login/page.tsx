@@ -57,8 +57,8 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error);
       } else {
-        router.push('/dashboard');
-        router.refresh();
+        // Use a hard redirect here to avoid Next.js router hanging after login
+        window.location.href = '/dashboard';
       }
     } catch {
       setError('로그인 중 오류가 발생했습니다');

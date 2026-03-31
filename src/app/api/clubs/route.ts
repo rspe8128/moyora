@@ -30,7 +30,7 @@ export async function GET() {
 
         const clubs = await Club.find({
             schoolId: userSession.schoolId
-        }).sort({ createdAt: -1 });
+        }).sort({ createdAt: -1 }).lean();
 
         return NextResponse.json({
             success: true,
