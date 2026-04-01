@@ -118,10 +118,8 @@ export default function DashboardPage() {
     const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
 
     useEffect(() => {
-        if (status === 'authenticated') {
-            fetchDashboardData();
-        }
-    }, [status]);
+        fetchDashboardData();
+    }, []);
 
     const fetchDashboardData = async () => {
         try {
@@ -159,7 +157,7 @@ export default function DashboardPage() {
             })),
     ] : [];
 
-    if (status === 'loading' || isLoading) {
+    if (isLoading) {
         return <DashboardSkeleton />;
     }
 
@@ -175,7 +173,7 @@ export default function DashboardPage() {
                             동아리 활동의 새로운 차원
                         </h1>
                         <p className="text-muted-foreground text-lg">
-                            {session?.user?.name}님, 오늘도 모여라에서 성장을 경험하세요.
+                            {dashboardData?.user?.name || session?.user?.name}님, 오늘도 모여라에서 성장을 경험하세요.
                         </p>
                     </div>
                     <div className="flex gap-2">
