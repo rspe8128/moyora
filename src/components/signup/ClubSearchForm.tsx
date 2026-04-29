@@ -102,7 +102,6 @@ export default function ClubSearchForm({ identityData, studentIdData }: ClubSear
             </button>
 
             {
-                // @ts-expect-error styled-jsx adds non-DOM `jsx` prop (see react-shim)
                 <style jsx>{`
                 .search-section {
                     background: #fff;

@@ -148,7 +148,7 @@ export default function AdminDashboard() {
                 </section>
             </main>
 
-            <style jsx>{`
+            <style>{`
                 .admin-page {
                     display: flex;
                     min-height: 100vh;

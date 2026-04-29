@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import Image from 'next/image';
 import NavBar from '@/components/NavBar';
 import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button"
@@ -172,7 +173,14 @@ export default function ClubRegisterPage() {
                                 <div className="flex items-center gap-4">
                                     {logoPreview ? (
                                         <div className="relative h-20 w-20 shrink-0">
-                                            <img src={logoPreview} alt="logo preview" className="h-20 w-20 rounded-xl object-cover border" />
+                                            <Image
+                                                src={logoPreview}
+                                                alt="logo preview"
+                                                width={80}
+                                                height={80}
+                                                unoptimized
+                                                className="h-20 w-20 rounded-xl border object-cover"
+                                            />
                                             <button type="button" onClick={removeLogo} className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center">
                                                 <X className="h-3 w-3" />
                                             </button>

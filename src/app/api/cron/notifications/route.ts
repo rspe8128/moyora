@@ -24,8 +24,7 @@ function authorizeCronRequest(request: NextRequest) {
     return null;
 }
 
-// POST - Run notification job (called by cron)
-export async function POST(request: NextRequest) {
+async function runNotificationJob(request: NextRequest) {
     try {
         const unauthorized = authorizeCronRequest(request);
         if (unauthorized) return unauthorized;
@@ -89,15 +88,10 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// GET - For authenticated health check
 export async function GET(request: NextRequest) {
-    const unauthorized = authorizeCronRequest(request);
-    if (unauthorized) return unauthorized;
+    return runNotificationJob(request);
+}
 
-    return NextResponse.json({
-        success: true,
-        message: 'Notification cron endpoint is active',
-        reminders: [7, 3, 1],
-        description: 'Creates notifications for events 7, 3, and 1 days before',
-    });
+export async function POST(request: NextRequest) {
+    return runNotificationJob(request);
 }

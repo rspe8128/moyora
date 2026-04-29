@@ -177,7 +177,7 @@ export default function AdminUsersPage() {
                 )}
             </main>
 
-            <style jsx>{`
+            <style>{`
                 .admin-page {
                     display: flex;
                     min-height: 100vh;

@@ -165,7 +165,6 @@ export default function ClubRegistrationForm({ identityData, studentIdData }: Cl
             </form>
 
             {
-                // @ts-expect-error styled-jsx adds non-DOM `jsx` prop (see react-shim)
                 <style jsx>{`
                 .signup-form {
                     display: flex;

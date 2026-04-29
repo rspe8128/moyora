@@ -14,6 +14,7 @@ declare module "react" {
     ): [S, Dispatch<SetStateAction<S>>];
 
     export function useEffect(effect: () => any, deps?: any[]): void;
+    export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: readonly any[]): T;
 
     /** Value refs: `current` matches the initial value type (not forced nullable). */
     export function useRef<T>(initialValue: T): { current: T };
@@ -25,14 +26,17 @@ declare module "react" {
     export function createContext<T>(defaultValue: T): any;
 
     export function useContext<T>(context: any): T;
+    export const Suspense: any;
 
     const React: {
         useState: typeof useState;
         useEffect: typeof useEffect;
+        useCallback: typeof useCallback;
         useRef: typeof useRef;
         useMemo: typeof useMemo;
         createContext: typeof createContext;
         useContext: typeof useContext;
+        Suspense: typeof Suspense;
     };
 
     export default React;
@@ -43,4 +47,3 @@ declare module "react/jsx-runtime" {
     export function jsx(type: any, props: any, key?: any): any;
     export function jsxs(type: any, props: any, key?: any): any;
 }
-
