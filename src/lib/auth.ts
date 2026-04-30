@@ -73,6 +73,7 @@ export const authOptions: NextAuthOptions = {
                 token.id = user.id;
                 token.schoolName = (user as { schoolName?: string }).schoolName;
                 token.schoolId = (user as { schoolId?: string }).schoolId;
+                token.role = (user as { role?: string }).role;
             }
             return token;
         },
@@ -81,6 +82,7 @@ export const authOptions: NextAuthOptions = {
                 (session.user as { id?: string }).id = token.id as string;
                 (session.user as { schoolName?: string }).schoolName = token.schoolName as string;
                 (session.user as { schoolId?: string }).schoolId = token.schoolId as string;
+                (session.user as { role?: string }).role = token.role as string;
             }
             return session;
         },
